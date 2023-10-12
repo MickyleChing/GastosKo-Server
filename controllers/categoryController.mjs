@@ -4,22 +4,17 @@ import constants from "../constants.mjs";
 import SubCategory from "../models/subCategoryModel.mjs";
 import Expense from "../models/expensesModel.mjs";
 
-//@desc Get category
-//route GET /api/users/category/:id
+//@desc Get all categories
+//route GET /api/users/category
 //@access Private
-/*export const getCategory = asyncHandler(async (req, res, next) => {
+export const getCategory = asyncHandler(async (req, res, next) => {
   try {
-    const category = await Category.findById(req.params.id);
-    if (!category) {
-      res.status(constants.NOT_FOUND);
-      throw new Error("Category not Found");
-    }
-    res.status(200).json(category);
+    const categories = await Category.find({});
+    res.status(200).json(categories);
   } catch (error) {
     next(error);
   }
 });
-*/
 
 //@desc Create Category
 //route POST /api/users/category
@@ -88,6 +83,9 @@ export const newSubCategory = asyncHandler(async (req, res, next) => {
     });
 
     res.status(201).json(subCategory);
+    console.log(
+      `New SubCategory added: ${subCategoryName} in ${categoryName} Category`
+    );
   } catch (error) {
     next(error);
   }

@@ -204,7 +204,7 @@ async function updateBudget(userId, startDate, endDate) {
 
     // Save the updated budget
     await budget.save();
-    console.log("Budget updated");
+    console.log("Budget updated: ", budget.currentBalance);
   } catch (error) {
     console.error("Error updating budget:", error);
   }
