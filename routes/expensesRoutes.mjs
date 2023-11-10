@@ -8,8 +8,10 @@ import {
   editExpensesPerDayPerId,
   getExpensesForCurrentMonth,
   getExpensesForCurrentWeek,
+  getExpensesForWeekInMonth,
   getExpensesPerDay,
   getExpensesPerDayPerId,
+  getExpensesByMonthOrYear,
   getExpensesPerUser,
 } from "../controllers/expensesController.mjs";
 
@@ -33,4 +35,15 @@ router.get(
   validatedToken,
   getExpensesForCurrentWeek
 );
+router.get(
+  "/user-expenses/:yearMonth",
+  validatedToken,
+  getExpensesByMonthOrYear
+); // Get ALL expenses on a specified Month
+router.get(
+  "/user-expenses/:yearMonth/:weekNumber",
+  validatedToken,
+  getExpensesForWeekInMonth
+);
+
 export default router;
