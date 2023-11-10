@@ -12,32 +12,42 @@ export const getBudget = asyncHandler(async (req, res, next) => {
     const date = req.params.date;
     const userId = req.user.id;
     const budget = await Budget.findOne({ date: date, userId });
+
     if (!budget) {
       return res
         .status(404)
         .json({ message: "No budget found for the specified date" });
     }
-    res.status(200).json(budget);
+
+    // Calculate the remaining budget (savings)
+    let totalBudget = 0;
+    budget.budgetPerCategory.forEach((item) => {
+      totalBudget += item.budgetAmount;
+    });
+    const savings = budget.budget - totalBudget;
+
+    // Include the savings in the response
+    res.status(200).json({ ...budget.toObject(), savings: savings });
   } catch (error) {
     next(error);
   }
 });
-
 //@desc GET Budget per Category using date
-//@route GET api/users/budget/:date/:categoryId
+//@route GET api/users/budget/:date/:categoryName
 //@access Private
 export const getBudgetPerCategory = asyncHandler(async (req, res, next) => {
   try {
     const date = req.params.date;
     const userId = req.user.id;
-    const categoryId = req.params.categoryId;
+    const categoryName = req.params.categoryName;
 
     // Check if a budget with the same user and month/year already exists
     const budget = await Budget.findOne({
       date: date,
-      "budgetPerCategory._id": categoryId,
+      "budgetPerCategory.categoryName": categoryName,
       userId,
     });
+
     if (!budget) {
       return res.status(404).json({ message: "No budget found" });
     }
@@ -48,13 +58,13 @@ export const getBudgetPerCategory = asyncHandler(async (req, res, next) => {
     }
 
     const budgetPerCategoryItem = budget.budgetPerCategory.find(
-      (item) => item._id?.toString() === categoryId
+      (item) => item.categoryName === categoryName
     );
     console.log("budgetPerCategoryItem:", budgetPerCategoryItem);
 
     if (!budgetPerCategoryItem) {
       return res.status(404).json({
-        message: "no category found for the specified date and id",
+        message: "no category found for the specified date and categoryName",
       });
     }
 
@@ -204,7 +214,14 @@ export const updateBudgetCategory = asyncHandler(async (req, res, next) => {
     // Save the updated budget document
     const updatedBudget = await existingBudget.save();
 
-    res.status(200).json(updatedBudget);
+    let totalBudget = 0;
+    existingBudget.budgetPerCategory.forEach((item) => {
+      totalBudget += item.budgetAmount;
+    });
+
+    const savings = existingBudget.budget - totalBudget;
+    console.log("Savings:", savings);
+    res.status(200).json({ updatedBudget, savings: savings });
   } catch (error) {
     next(error);
   }

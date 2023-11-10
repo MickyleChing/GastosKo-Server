@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 router.get("/budget/:date", validatedToken, getBudget);
 router.put("/budget/:date", validatedToken, editBudget);
-router.get("/budget/:date/:categoryId", validatedToken, getBudgetPerCategory);
+router.get("/budget/:date/:categoryName", validatedToken, getBudgetPerCategory);
 router.post("/new-budget", validatedToken, createBudget);
 router.put("/budget-category/:date", validatedToken, updateBudgetCategory);
 router.delete(

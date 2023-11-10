@@ -301,6 +301,115 @@ export const getExpensesPerUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+//@desc GET expenses for a specific Month or Year
+//route /api/users/user-expenses/:yearMonth
+//@access Private
+export const getExpensesByMonthOrYear = asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const yearMonth = req.params.yearMonth;
+    const [year, month] = yearMonth.split("-");
+
+    let userExpenses = [];
+
+    if (month) {
+      // If month is provided, query expenses for the specific month and year
+      userExpenses = await Expense.find({
+        date: {
+          $gte: new Date(year, month - 1, 1), // Start of the specified month
+          $lt: new Date(year, month, 1), // Start of the next month
+        },
+        user: userId,
+      });
+    } else {
+      // If only the year is provided, query expenses for the entire year
+      userExpenses = await Expense.find({
+        date: {
+          $gte: new Date(year, 0, 1), // Start of the year
+          $lt: new Date(Number(year) + 1, 0, 1), // Start of the next year
+        },
+        user: userId,
+      });
+    }
+
+    if (userExpenses.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No expenses found for the specified date." });
+    }
+
+    let totalAmount = 0;
+
+    if (month) {
+      totalAmount = userExpenses.reduce(
+        (total, expense) => total + expense.totalAmountInArray,
+        0
+      );
+      console.log(`Total for the Month: ${year} - ${month}`, totalAmount);
+    } else {
+      totalAmount = userExpenses.reduce(
+        (total, expense) => total + expense.totalAmountInArray,
+        0
+      );
+      console.log(`Total for the Year ${year}:`, totalAmount);
+    }
+
+    res.status(200).json({ userExpenses, totalAmount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+//@desc GET expenses for a specific Week within a Month
+//route /api/users/user-expenses/:yearMonth/:weekNumber
+//@access Private
+export const getExpensesForWeekInMonth = asyncHandler(
+  async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const yearMonth = req.params.yearMonth;
+      const weekNumber = req.params.weekNumber;
+      const [year, month] = yearMonth.split("-");
+
+      // Calculate the start and end dates for the specific week
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+
+      // Calculate the start and end dates for the specific week based on weekNumber
+      startDate.setDate(1 + (weekNumber - 1) * 7);
+      endDate.setDate(7 * weekNumber);
+
+      const userExpensesForWeekInMonth = await Expense.find({
+        date: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+        user: userId,
+      });
+
+      if (userExpensesForWeekInMonth.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "No expenses found for the specified week." });
+      }
+
+      // Calculate the totalAmountForWeek by summing totalAmountInArray from each expense
+      const totalAmountForWeek = userExpensesForWeekInMonth.reduce(
+        (total, expense) => total + expense.totalAmountInArray,
+        0
+      );
+
+      console.log(
+        `Total for Week ${weekNumber} in ${year} - ${month}`,
+        totalAmountForWeek
+      );
+      res.status(200).json({ userExpensesForWeekInMonth, totalAmountForWeek });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // @desc get expenses for the current month and year
 // route GET /api/users/user-expenses/current
 // @access Private
@@ -330,14 +439,25 @@ export const getExpensesForCurrentMonth = asyncHandler(
         });
       }
 
-      res.status(200).json(userExpenses);
+      const totalAmountPerMonth = userExpenses.reduce(
+        (total, expense) => total + expense.totalAmountInArray,
+        0
+      );
+      console.log("Total for this Month: ", totalAmountPerMonth);
+      // Prepare the response object
+      const response = {
+        userExpenses,
+        totalAmountPerMonth,
+      };
+
+      res.status(200).json(response);
     } catch (error) {
       next(error);
     }
   }
 );
 
-// @desc get expenses for the current week and month
+// @desc get expenses for the current week and total amount for the week
 // route GET /api/users/user-expenses/current-week
 // @access Private
 export const getExpensesForCurrentWeek = asyncHandler(
@@ -362,7 +482,7 @@ export const getExpensesForCurrentWeek = asyncHandler(
         currentDate.getDate() + (6 - currentDate.getDay())
       );
 
-      // Find expenses for the specified user within the current week and month
+      // Find expenses for the specified user within the current week
       const userExpenses = await Expense.find({
         user: userId,
         date: { $gte: startOfWeek, $lte: endOfWeek },
@@ -370,11 +490,23 @@ export const getExpensesForCurrentWeek = asyncHandler(
 
       if (userExpenses.length === 0) {
         return res.status(404).json({
-          message: "No expenses found for the current week and month.",
+          message: "No expenses found for the current week",
         });
       }
 
-      res.status(200).json(userExpenses);
+      // Calculate the total amount for the week
+      const totalAmountPerWeek = userExpenses.reduce(
+        (total, expense) => total + expense.totalAmountInArray,
+        0
+      );
+      console.log("Total for this Week: ", totalAmountPerWeek);
+
+      const response = {
+        userExpenses,
+        totalAmountPerWeek,
+      };
+
+      res.status(200).json(response);
     } catch (error) {
       next(error);
     }
@@ -454,7 +586,6 @@ export const editExpensesPerDayPerId = asyncHandler(async (req, res, next) => {
   }
 });
 
-//NO update for budget yet
 //@desc Delete an expense item in the expense Array
 //@route DELETE api/users/expense/:expenseId
 //@access Private
@@ -529,8 +660,7 @@ export const deleteExpensePerDayPerId = asyncHandler(async (req, res, next) => {
 export const deleteExpensePerDay = asyncHandler(async (req, res, next) => {
   try {
     const date = req.params.date;
-    const userId = req.user.id;
-    const deletedExpenses = await Expense.findOneAndDelete({ date, userId });
+    const deletedExpenses = await Expense.findOneAndDelete({ date });
 
     if (!deletedExpenses) {
       return res
