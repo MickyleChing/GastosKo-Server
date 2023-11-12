@@ -2,6 +2,9 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.mjs";
 import asyncHandler from "express-async-handler";
 import bcrypt from "bcrypt";
+import { OAuth2Client } from "google-auth-library";
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 //@desc register User
 //@route POST /api/users/register
@@ -104,6 +107,69 @@ export const loginUser = asyncHandler(async (req, res) => {
   }
 });
 
+//@desc Google Sign-In
+//@route POST /api/users/googlelogin
+//@access public
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { tokenId } = req.body;
+
+  try {
+    // Verify the Google token
+    const ticket = await client.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const { email, given_name, family_name } = ticket.getPayload();
+
+    // Check if the user with the provided email already exists
+    let user = await User.findOne({ email });
+
+    // If the user doesn't exist, create a new user
+    if (!user) {
+      const username = email.split("@")[0]; // You can customize the username logic
+      const hashedPassword = await bcrypt.hash(email, 10); // You can customize the password logic
+      user = await User.create({
+        email,
+        username,
+        password: hashedPassword,
+        firstName: given_name,
+        lastName: family_name,
+      });
+    }
+
+    // Generate an access token
+    const accessToken = jwt.sign(
+      {
+        user: {
+          username: user.username,
+          email: user.email,
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "60m" }
+    );
+
+    // Send the access token and user information in the response
+    res.status(200).json({
+      accessToken,
+      user: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: `Google Sign-In failed: ${error.message}` });
+  }
+});
+
 //@description Get Current User profile
 //@route GET /api/users/currentUser
 //@access private
@@ -125,7 +191,6 @@ export const currentUser = asyncHandler(async (req, res) => {
     username,
     userId: _id,
   });
-
 });
 
 //@description Update/Edit Profile
